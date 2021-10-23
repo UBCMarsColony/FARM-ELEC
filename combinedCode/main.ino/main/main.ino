@@ -149,10 +149,12 @@ void sendDataToSerial()
 // CO2 LOOP CODE--------------------------------------------------------------
 void CO2PumpLoop(float co2)
 {
-  // Actual code needs to continuously read co2 till it reaches CO2_UPPER_THRESHOLD
+  //! Actual code needs to continuously read co2 till it reaches CO2_UPPER_THRESHOLD
+  //! Need to check if we can do interrupts, or test with different delayTime for most efficient opening/closing of pump
   if(co2 < CO2_LOWER_THRESHOLD)
-    while(co2 < CO2_UPPER_THRESHOLD)
-      digitalWrite(PUMP, 1);
+    digitalWrite(PUMP, 1);
+  else if(co2 >= CO2_UPPER_THRESHOLD)
+    digitalWrite(PUMP, 0);
 }
 
 
