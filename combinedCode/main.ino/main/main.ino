@@ -35,21 +35,45 @@
 // SOFTWARE. 
 // ----------------------------------------------------------------------------
 // Program variables ----------------------------------------------------------
-#include <DHT.h>
 #include <Wire.h>
-//constants
-#define DHTPIN 7     // what pin we're connected to
-#define DHTTYPE DHT22   // DHT 22  (AM2302)
-DHT dht(DHTPIN, DHTTYPE); //// Initialize DHT sensor for normal 16mhz Arduino
-//variables
-int chk;
+
+// CO2 K30
+#include "kSeries.h"
+
+// DHT22
+#include <DHT.h>
+
+// BME280
+#include <SPI.h>
+#include <Adafruit_Sensor.h>
+#include <Adafruit_BME280.h>
+
+// Constants
+#define Rx 12                           // Rx pin for CO2
+#define Tx 13                           // Tx pin for CO2
+#define CO2_LOWER_THRESHOLD 1100        // Threshold below which to enable pump
+#define CO2_UPPER_THRESHOLD 1300        // Threshold above which to enable pump
+#define PUMP 1                          // Pump pin connection
+#define DHTPIN 7                        // What pin we're connected to
+#define DHTTYPE DHT22                   // DHT 22  (AM2302)
+#define SEALEVELPRESSURE_HPA (1013.25)  // Constant sea level pressure
+
+// Initializations
+kSeries k30(Rx, Tx);      // Initialize CO2 sensor for kSeries k30
+DHT dht(DHTPIN, DHTTYPE); // Initialize DHT sensor for normal 16mhz Arduino
+Adafruit_BME280 bme;      // Initialize BME280 for I2C (Adafruit code)
+
+// Variables
+float co2;  //Stores CO2 value
 float hum;  //Stores humidity value
 float temp; //Stores temperature value
-//for the C02 sensor
-int co2Addr = 0x68;
-//.
-int exampleVariable = 0;
-int sensorPin = 7;
+float pres; //Stores pressure value
+float alt;  //Stores altitude value
+
+unsigned long delayTime = 10000;  //Current delay time between readings
+int bmeAddr = 0x76;               //BME280 sensor address
+int bmeAddr2 = 0x77;              //BME280 sensor address for second BME sensor
+
 // Serial data variables ------------------------------------------------------
 //Incoming Serial Data Array
 const byte kNumberOfChannelsFromExcel = 6; 
@@ -60,12 +84,15 @@ const int kSerialInterval = 50;
 // Timestamp to track serial interval
 unsigned long serialPreviousTime; 
 char* arr[kNumberOfChannelsFromExcel];
+
 // SETUP ----------------------------------------------------------------------
 void setup() {
   // Initialize Serial Communication
   Serial.begin(9600);  
-   dht.begin();
+  // dht.begin(); // DHT backup
+  bme.begin(bmeAddr, &Wire);
 }
+
 // START OF MAIN LOOP --------------------------------------------------------- 
 void loop()
 {
@@ -75,23 +102,25 @@ void loop()
   processIncomingSerial();
   // Process and send data to Excel via serial port (Data Streamer)
   processOutgoingSerial();
-// Compares STR1 to STR2 returns 0 if true.
-//   if ( strcmp ("Apple", arr[0]) == 0){ 
-//       Serial.println("working");
-//   }
 }
+
 // SENSOR INPUT CODE-----------------------------------------------------------
 void processSensors() 
 {
-    hum = dht.readHumidity();
-    temp = dht.readTemperature();
-    delay(10000);
-  // Read sensor pin and store to a variable
-//  exampleVariable = digitalRead( sensorPin );
+  // Read sensor inputs
+  // hum = dht.readHumidity();                  // DHT backup
+  // temp = dht.readTemperature();              // DHT backup
+  co2 = k30.getCO2('p');                        // Read CO2 (K30)
+  hum = bme.readHumidity();                     // Read humidity (BME)
+  temp = bme.readTemperature();                 // Read temperature (BME)
+  pres = bme.readPressure() / 100.0F;           // Read pressure (BME)
+  alt = bme.readAltitude(SEALEVELPRESSURE_HPA); // Read altitude (BME)
+
+  CO2PumpLoop(co2);                             // Loop to pump CO2
   
-  // Add any additional raw data analysis below (e.g. unit conversions)
-  
+  delay(delayTime);                             // Delay between signal reads
 }
+
 // Add any specialized methods and processing code below
 
 // OUTGOING SERIAL DATA PROCESSING CODE----------------------------------------
@@ -99,13 +128,31 @@ void sendDataToSerial()
 {
   // Send data out separated by a comma (kDelimiter)
   // Repeat next 2 lines of code for each variable sent:
+  Serial.print(co2);
+  Serial.print(kDelimiter);
+  
   Serial.print(hum);
   Serial.print(kDelimiter);
 
   Serial.print(temp);
   Serial.print(kDelimiter);
+
+  Serial.print(pres);
+  Serial.print(kDelimiter);
+
+  Serial.print(alt);
+  Serial.print(kDelimiter);
   
   Serial.println(); // Add final line ending character only once
+}
+
+// CO2 LOOP CODE--------------------------------------------------------------
+void CO2PumpLoop(float co2)
+{
+  // Actual code needs to continuously read co2 till it reaches CO2_UPPER_THRESHOLD
+  if(co2 < CO2_LOWER_THRESHOLD)
+    while(co2 < CO2_UPPER_THRESHOLD)
+      digitalWrite(PUMP, 1);
 }
 
 
