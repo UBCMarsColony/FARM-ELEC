@@ -69,6 +69,8 @@ float hum;  //Stores humidity value
 float temp; //Stores temperature value
 float pres; //Stores pressure value
 float alt;  //Stores altitude value
+float hum_dht;  //Stores humidity value from DHT
+float temp_dht; //Stores temperature value from DHT
 
 unsigned long delayTime = 10000;  //Current delay time between readings
 int bmeAddr = 0x76;               //BME280 sensor address
@@ -89,7 +91,7 @@ char* arr[kNumberOfChannelsFromExcel];
 void setup() {
   // Initialize Serial Communication
   Serial.begin(9600);  
-  // dht.begin(); // DHT backup
+  dht.begin(); // DHT backup
   bme.begin(bmeAddr, &Wire);
 }
 
@@ -108,8 +110,8 @@ void loop()
 void processSensors() 
 {
   // Read sensor inputs
-  // hum = dht.readHumidity();                  // DHT backup
-  // temp = dht.readTemperature();              // DHT backup
+  hum_dht = dht.readHumidity();                 // DHT backup
+  temp_dht = dht.readTemperature();             // DHT backup
   co2 = k30.getCO2('p');                        // Read CO2 (K30)
   hum = bme.readHumidity();                     // Read humidity (BME)
   temp = bme.readTemperature();                 // Read temperature (BME)
@@ -141,6 +143,12 @@ void sendDataToSerial()
   Serial.print(kDelimiter);
 
   Serial.print(alt);
+  Serial.print(kDelimiter);
+
+  Serial.print(hum_dht);
+  Serial.print(kDelimiter);
+
+  Serial.print(temp_dht);
   Serial.print(kDelimiter);
   
   Serial.println(); // Add final line ending character only once
