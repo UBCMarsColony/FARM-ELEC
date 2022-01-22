@@ -1,5 +1,5 @@
 #include "kSeries.h" //include kSeries Library
-kSeries K_30(12,13); //Initialize a kSeries Sensor with pin 12 as Rx and 13 as Tx
+kSeries K_30(4,5); //Initialize a kSeries Sensor with pin 12 as Rx and 13 as Tx
 int pump = 1;
 
 

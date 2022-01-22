@@ -10,10 +10,6 @@
 // software serial #1: TX = digital pin 10, RX = digital pin 11
 SoftwareSerial portOne(12,13);
 #include "Wire.h"
-#include "LiquidCrystal.h"
-
-// Connect via i2c, default address #0 (A0-A2 not jumpered)
-LiquidCrystal lcd(0);
 
 // software serial #2: TX = digital pin 8, RX = digital pin 9
 // on the Mega, use other pins instead, since 8 and 9 don't work on the Mega
@@ -29,16 +25,7 @@ int valMultiplier = 1;
 
 void setup()
 {
- // set up the LCD's number of rows and columns: 
-  lcd.begin(16, 2);
-  lcd.print("Hello!"); 
-  delay(5000);
-  lcd.setCursor(0, 0);
-  lcd.print("CO2-in:");
-  lcd.setCursor(0, 1); 
-  lcd.print("CO2-out:");    
-  
- // Open serial communications and wait for port to open:
+  // Open serial communications and wait for port to open:
   Serial.begin(9600);
 
 
@@ -56,14 +43,6 @@ void loop()
   unsigned long valCO2A = getValueA(response); 
   Serial.print("Co2 A = "); 
   Serial.println(valCO2A); 
-  lcd.setCursor(8, 0);
-  
-  for (int i = 0; i < 16; ++i)
-{
-  lcd.write(' ');
-}
-  lcd.setCursor(8, 0);
-  lcd.print(valCO2A);  
   delay(5000);
 
  
@@ -77,14 +56,6 @@ void loop()
   unsigned long valCO2B = getValueB(response); 
   Serial.print("Co2 B = "); 
   Serial.println(valCO2B);
-  lcd.setCursor(9, 1);
-  
-  for (int i = 0; i < 16; ++i)
-{
-  lcd.write(' ');
-}  
-  lcd.setCursor(9, 1);
-  lcd.print(valCO2B);
   delay(5000);
 
 

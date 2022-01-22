@@ -38,7 +38,8 @@
 #include <Wire.h>
 
 // CO2 K30
-#include "kSeries.h"
+//#include "kSeries.h"
+#include <SoftwareSerial.h>
 
 // DHT22
 #include <DHT.h>
@@ -49,8 +50,10 @@
 #include <Adafruit_BME280.h>
 
 // Constants
-#define Rx 12                           // Rx pin for CO2
-#define Tx 13                           // Tx pin for CO2
+#define Rx1 8                           // Rx pin for CO2 (control)
+#define Tx1 9                           // Tx pin for CO2 (control)
+#define Rx2 12                          // Rx pin for CO2 (lpgc)
+#define Tx2 13                          // Tx pin for CO2 (lpgc)
 #define CO2_LOWER_THRESHOLD 1100        // Threshold below which to enable pump
 #define CO2_UPPER_THRESHOLD 1300        // Threshold above which to enable pump
 #define PUMP 1                          // Pump pin connection
@@ -59,28 +62,32 @@
 #define SEALEVELPRESSURE_HPA (1013.25)  // Constant sea level pressure
 
 // Initializations
-kSeries k30(Rx, Tx);      // Initialize CO2 sensor for kSeries k30
+SoftwareSerial portOne(Rx1, Tx1);    // Initialize CO2 sensor for kSeries k30 (control)
+SoftwareSerial portTwo(Rx2, Tx2);    // Initialize CO2 sensor for kSeries k30 (lpgc)
+
 DHT dht(DHTPIN, DHTTYPE); // Initialize DHT sensor for normal 16mhz Arduino
 Adafruit_BME280 bme;      // Initialize BME280 for I2C (Adafruit code)
 
 // Variables
-float co2;  //Stores CO2 value
+float co2_control; //Stores CO2 value (control)
+float co2_lpgc;    //Stores CO2 value (lpgc)
 float hum;  //Stores humidity value
 float temp; //Stores temperature value
 float pres; //Stores pressure value
-float alt;  //Stores altitude value
 float hum_dht;  //Stores humidity value from DHT
 float temp_dht; //Stores temperature value from DHT
 
-unsigned long delayTime = 10000;  //Current delay time between readings
+unsigned long delayTime = 5000;  //Current delay time between readings
 int bmeAddr = 0x76;               //BME280 sensor address
 int bmeAddr2 = 0x77;              //BME280 sensor address for second BME sensor
+byte readCO2[] = {0xFE, 0X44, 0X00, 0X08, 0X02, 0X9F, 0X25}; //Command packet to read Co2 (see app note) 
+byte response[] = {0,0,0,0,0,0,0}; //create an array to store the response 
 
 // Serial data variables ------------------------------------------------------
 //Incoming Serial Data Array
 const byte kNumberOfChannelsFromExcel = 6; 
 // Comma delimiter to separate consecutive data if using more than 1 sensor
-const char kDelimiter = ',';    
+const char kDelimiter = '|';    
 // Interval between serial writes
 const int kSerialInterval = 50;   
 // Timestamp to track serial interval
@@ -91,6 +98,9 @@ char* arr[kNumberOfChannelsFromExcel];
 void setup() {
   // Initialize Serial Communication
   Serial.begin(9600);  
+  // Start each software serial port
+  portOne.begin(9600);
+  portTwo.begin(9600);
   dht.begin(); // DHT backup
   bme.begin(bmeAddr, &Wire);
 }
@@ -112,13 +122,22 @@ void processSensors()
   // Read sensor inputs
   hum_dht = dht.readHumidity();                 // DHT backup
   temp_dht = dht.readTemperature();             // DHT backup
-  co2 = k30.getCO2('p');                        // Read CO2 (K30)
+//  co2_control = k30_control.getCO2('p');        // Read CO2 (K30 control)
+//  co2_lpgc = k30_lpgc.getCO2('p');              // Read CO2 (K30 lpgc)
   hum = bme.readHumidity();                     // Read humidity (BME)
   temp = bme.readTemperature();                 // Read temperature (BME)
   pres = bme.readPressure() / 100.0F;           // Read pressure (BME)
-  alt = bme.readAltitude(SEALEVELPRESSURE_HPA); // Read altitude (BME)
 
-  CO2PumpLoop(co2);                             // Loop to pump CO2
+  portOne.listen();
+  sendRequestA(readCO2); 
+  co2_control = getValueA(response); 
+
+  // Now listen on the second port
+  portTwo.listen();
+  sendRequestB(readCO2); 
+  co2_lpgc = getValueB(response);   
+
+  //CO2PumpLoop(co2_lpgc);                             // Loop to pump CO2
   
   delay(delayTime);                             // Delay between signal reads
 }
@@ -130,7 +149,10 @@ void sendDataToSerial()
 {
   // Send data out separated by a comma (kDelimiter)
   // Repeat next 2 lines of code for each variable sent:
-  Serial.print(co2);
+  Serial.print(co2_control);
+  Serial.print(kDelimiter);
+  
+  Serial.print(co2_lpgc);
   Serial.print(kDelimiter);
   
   Serial.print(hum);
@@ -140,9 +162,6 @@ void sendDataToSerial()
   Serial.print(kDelimiter);
 
   Serial.print(pres);
-  Serial.print(kDelimiter);
-
-  Serial.print(alt);
   Serial.print(kDelimiter);
 
   Serial.print(hum_dht);
@@ -212,4 +231,85 @@ void parseData(char data[])
       token = strtok(NULL, ","); // Conintue to the next delimeter
       index++; // incremenet index to store next value
     }
+}
+
+//*************************************************************************
+void sendRequestA(byte packet[]) 
+{ 
+ while(!portOne.available()) //keep sending request until we start to get a response 
+ { 
+ portOne.write(readCO2,7); 
+
+ delay(50); 
+
+ } 
+ int timeout=0; //set a timeoute counter 
+ while(portOne.available() < 7 ) //Wait to get a 7 byte response 
+ { 
+ timeout++; 
+ if(timeout > 10) //if it takes to long there was probably an error 
+ { 
+ while(portOne.available()) //flush whatever we have 
+ portOne.read(); 
+ break; //exit and try again 
+ } 
+ delay(50); 
+ } 
+ for (int i=0; i < 7; i++) 
+ { 
+ response[i] = portOne.read(); 
+ } 
+} 
+
+
+unsigned long getValueA(byte packet[]) 
+{ 
+ int high = packet[3]; //high byte for value is 4th byte in packet in the packet 
+ int low = packet[4]; //low byte for value is 5th byte in the packet 
+ unsigned long val = high*256 + low; //Combine high byte and low byte with this formula to get value 
+ return val; 
+
+}
+
+
+
+//*************************************************************************
+void sendRequestB(byte packet[]) 
+{ 
+ while(!portTwo.available()) //keep sending request until we start to get a response 
+ { 
+ portTwo.write(readCO2,7); 
+
+ delay(50); 
+
+ } 
+ int timeout=0; //set a timeoute counter 
+ while(portTwo.available() < 7 ) //Wait to get a 7 byte response 
+ { 
+ timeout++; 
+ if(timeout > 10) //if it takes to long there was probably an error 
+ { 
+ while(portTwo.available()) //flush whatever we have 
+ portTwo.read(); 
+ break; //exit and try again 
+ } 
+
+ delay(50); 
+ 
+ } 
+ for (int i=0; i < 7; i++) 
+ {
+ response[i] = portTwo.read(); 
+ } 
+
+} 
+
+
+unsigned long getValueB(byte packet[]) 
+{ 
+ int high = packet[3]; //high byte for value is 4th byte in packet in the packet 
+ int low = packet[4]; //low byte for value is 5th byte in the packet 
+ unsigned long val = high*256 + low; //Combine high byte and low byte with this formula to get value 
+ return val; 
+
 }
