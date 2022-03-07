@@ -7,7 +7,7 @@
 
 #include "SoftwareSerial.h"
 
-SoftwareSerial K_30_Serial(12,13);  //Sets up a virtual serial port
+SoftwareSerial K_30_Serial(8,9);  //Sets up a virtual serial port
                                     //Using pin 12 for Rx and pin 13 for Tx
 
 
@@ -71,5 +71,3 @@ unsigned long getValue(byte packet[])
     unsigned long val = high*256 + low;                //Combine high byte and low byte with this formula to get value
     return val* valMultiplier;
 }
-
-

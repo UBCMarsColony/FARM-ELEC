@@ -122,11 +122,12 @@ void sendRequestB(byte packet[])
  while(!portTwo.available()) //keep sending request until we start to get a response 
  { 
  portTwo.write(readCO2,7); 
+  Serial.println("ded");
 
  delay(50); 
 
  } 
- int timeout=0; //set a timeoute counter 
+ int timeout=500; //set a timeoute counter 
  while(portTwo.available() < 7 ) //Wait to get a 7 byte response 
  { 
  timeout++; 

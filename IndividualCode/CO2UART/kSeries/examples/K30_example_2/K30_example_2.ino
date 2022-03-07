@@ -4,7 +4,7 @@
  Co2Meter.com
 */
 #include "kSeries.h" //include kSeries Library
-kSeries K_30(12,13); //Initialize a kSeries Sensor with pin 12 as Rx and 13 as Tx
+kSeries K_30(8, 9); //Initialize a kSeries Sensor with pin 12 as Rx and 13 as Tx
 void setup()
 {
  Serial.begin(9600); //start a serial port to communicate with the computer

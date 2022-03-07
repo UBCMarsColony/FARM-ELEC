@@ -16,7 +16,7 @@
 // 
 // Copyright 2019, Jen Fox Microsoft EDU Workshop - HackingSTEM 
 // 
-// Permission is hereby granted, free of charge, to any person obtaining a copy
+// Permission is hereby granted, free of charge, to any person obtaining a copym
 // of this software and associated documentation files (the "Software"), to deal
 // in the Software without restriction, including without limitation the rights to
 // use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies
@@ -53,7 +53,7 @@
 #define Tx2 13                          // Tx pin for CO2 (lpgc)
 #define CO2_LOWER_THRESHOLD 1100        // Threshold below which to enable pump
 #define CO2_UPPER_THRESHOLD 1300        // Threshold above which to enable pump
-#define PUMP 1                          // Pump pin connection
+#define RELAY_PUMP A1                          // Pump pin connection
 
 // Initializations
 SoftwareSerial portOne(Rx1, Tx1);    // Initialize CO2 sensor for kSeries k30 (control)
@@ -82,7 +82,7 @@ byte response[] = {0,0,0,0,0,0,0}; //create an array to store the response
 //Incoming Serial Data Array
 const byte kNumberOfChannelsFromExcel = 6; 
 // Comma delimiter to separate consecutive data if using more than 1 sensor
-const char kDelimiter = '|';    
+const char kDelimiter = ',';    
 // Interval between serial writes
 const int kSerialInterval = 50;   
 // Timestamp to track serial interval
@@ -96,9 +96,12 @@ void setup() {
   // Start each software serial port
   portOne.begin(9600);
   portTwo.begin(9600);
+  // Start bmes
   bme_control.begin(0x76, &Wire);
   bme_lpgc.begin(0x77, &Wire);
-
+  
+  // Set pump relay pin mode
+  pinMode(RELAY_PUMP, OUTPUT);
 }
 
 // START OF MAIN LOOP --------------------------------------------------------- 
@@ -137,9 +140,9 @@ void processSensors()
   sendRequestB(readCO2); 
   co2_lpgc = getValueB(response);   
 
-  //CO2PumpLoop(co2_lpgc);                             // Loop to pump CO2
+  //CO2PumpLoop(co2_lpgc);                                    // Loop to pump CO2
   
-  delay(delayTime);                             // Delay between signal reads
+  delay(delayTime);                                           // Delay between signal reads
 }
 
 // Add any specialized methods and processing code below
@@ -182,14 +185,10 @@ void CO2PumpLoop(float co2)
   //! Actual code needs to continuously read co2 till it reaches CO2_UPPER_THRESHOLD
   //! Need to check if we can do interrupts, or test with different delayTime for most efficient opening/closing of pump
   if(co2 < CO2_LOWER_THRESHOLD)
-    digitalWrite(PUMP, 1);
+    digitalWrite(RELAY_PUMP, HIGH);
   else if(co2 >= CO2_UPPER_THRESHOLD)
-    digitalWrite(PUMP, 0);
+    digitalWrite(RELAY_PUMP, LOW);
 }
-
-
-
-
 
 
 
