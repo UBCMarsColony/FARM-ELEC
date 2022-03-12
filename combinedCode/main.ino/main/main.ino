@@ -52,8 +52,10 @@
 #define TX_L 13                  // tx pin for CO2 (lpgc)
 #define CO2_LOWER_THRESHOLD 1100 // threshold below which to enable pump
 #define CO2_UPPER_THRESHOLD 1300 // threshold above which to enable pump
-#define RELAY_C A0               // pump pin connection (control)
-#define RELAY_L A1               // pump pin connection (lpgc)
+#define RELAY_CO2_C A0               // pump pin connection (control)
+#define RELAY_CO2_L A1               // pump pin connection (lpgc)
+#define RELAY_LED_C A2           // pump pin connection (lpgc)
+#define RELAY_LED_L A3           // pump pin connection (lpgc)
 
 // Initializations
 SoftwareSerial portOne(RX_C, TX_C); // initialize CO2 sensor for kSeries k30 (control)
@@ -85,8 +87,6 @@ const int kSerialInterval = 50;            // interval between serial writes
 unsigned long serialPreviousTime;          // timestamp to track serial interval
 char *arr[kNumberOfChannelsFromExcel];     // array to parse data
 
-int tmpbool = 0; // tmp var to switch pump on/off
-
 // SETUP ----------------------------------------------------------------------
 void setup()
 {
@@ -100,8 +100,14 @@ void setup()
   bme_lpgc.begin(0x77, &Wire);
 
   // Set pump relay pin mode
-  pinMode(RELAY_C, OUTPUT);
-  pinMode(RELAY_L, OUTPUT);
+  pinMode(RELAY_CO2_C, OUTPUT);
+  pinMode(RELAY_CO2_L, OUTPUT);
+  pinMode(RELAY_LED_C, OUTPUT);
+  pinMode(RELAY_LED_L, OUTPUT);
+
+  // Set LEDs on 
+  digitalWrite(RELAY_LED_C, HIGH);
+  digitalWrite(RELAY_LED_L, HIGH);
 }
 
 // START OF MAIN LOOP ---------------------------------------------------------
@@ -141,10 +147,9 @@ void processSensors()
   sendRequestB(readCO2);
   co2_lpgc = getValueB(response);
 
-  // CO2 Pump Loops
-  tmpbool = ~tmpbool;
-  CO2PumpLoop(RELAY_C, tmpbool); // loop to control pump
-  CO2PumpLoop(RELAY_L, tmpbool); // loop to lpgc pump
+  // Pump Loops
+  pumpLoop(RELAY_CO2_C, co2_control, CO2_UPPER_THRESHOLD, CO2_LOWER_THRESHOLD); // loop to control pump
+  pumpLoop(RELAY_CO2_L, co2_lpgc, CO2_UPPER_THRESHOLD, CO2_LOWER_THRESHOLD); // loop to lpgc pump
 
   delay(delayTime); // delay between signal reads
 }
@@ -183,20 +188,13 @@ void sendDataToSerial()
   Serial.println(); // add final line ending character only once
 }
 
-// CO2 LOOP CODE--------------------------------------------------------------
-void CO2PumpLoop(uint8_t relay, int co2)
+// PUMP LOOP CODE--------------------------------------------------------------
+void pumpLoop(uint8_t relay, int threshold, int upper, int lower)
 {
-  //! Actual code needs to continuously read co2 till it reaches CO2_UPPER_THRESHOLD
-  //! Need to check if we can do interrupts, or test with different delayTime for most efficient opening/closing of pump
-  if (co2 == 1)
-    digitalWrite(relay, HIGH);
-  else
+  if (threshold <= lower)
     digitalWrite(relay, LOW);
-
-  // if (co2 < CO2_LOWER_THRESHOLD)
-  //   digitalWrite(RELAY_PUMP, HIGH);
-  // else if (co2 >= CO2_UPPER_THRESHOLD)
-  //   digitalWrite(RELAY_PUMP, LOW);
+  else
+    digitalWrite(relay, HIGH);
 }
 
 //-----------------------------------------------------------------------------
