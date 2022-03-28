@@ -46,16 +46,16 @@
 #include <Adafruit_BME280.h>
 
 // Constants
-#define RX_C 8                   // rx pin for CO2 (control)
-#define TX_C 9                   // tx pin for CO2 (control)
-#define RX_L 12                  // rx pin for CO2 (lpgc)
-#define TX_L 13                  // tx pin for CO2 (lpgc)
-#define CO2_LOWER_THRESHOLD 1100 // threshold below which to enable pump
-#define CO2_UPPER_THRESHOLD 1300 // threshold above which to enable pump
-#define RELAY_CO2_C A0               // pump pin connection (control)
-#define RELAY_CO2_L A1               // pump pin connection (lpgc)
-#define RELAY_LED_C A2           // pump pin connection (lpgc)
-#define RELAY_LED_L A3           // pump pin connection (lpgc)
+#define RX_C 8                  // rx pin for CO2 (control)
+#define TX_C 9                  // tx pin for CO2 (control)
+#define RX_L 12                 // rx pin for CO2 (lpgc)
+#define TX_L 13                 // tx pin for CO2 (lpgc)
+#define CO2_LOWER_THRESHOLD 1000 // threshold below which to enable pump
+#define CO2_UPPER_THRESHOLD 600 // threshold above which to enable pump
+#define RELAY_CO2_C A1          // pump pin connection (control)
+#define RELAY_CO2_L A0          // pump pin connection (lpgc)
+#define RELAY_LED_C A2          // pump pin connection (lpgc)
+#define RELAY_LED_L A3          // pump pin connection (lpgc)
 
 // Initializations
 SoftwareSerial portOne(RX_C, TX_C); // initialize CO2 sensor for kSeries k30 (control)
@@ -87,6 +87,8 @@ const int kSerialInterval = 50;            // interval between serial writes
 unsigned long serialPreviousTime;          // timestamp to track serial interval
 char *arr[kNumberOfChannelsFromExcel];     // array to parse data
 
+int tmp = 0;
+
 // SETUP ----------------------------------------------------------------------
 void setup()
 {
@@ -106,8 +108,10 @@ void setup()
   pinMode(RELAY_LED_L, OUTPUT);
 
   // Set LEDs on 
-  digitalWrite(RELAY_LED_C, HIGH);
-  digitalWrite(RELAY_LED_L, HIGH);
+  digitalWrite(RELAY_LED_C, LOW);
+  digitalWrite(RELAY_LED_L, LOW);
+  digitalWrite(RELAY_CO2_C, LOW);
+  digitalWrite(RELAY_CO2_L, LOW);
 }
 
 // START OF MAIN LOOP ---------------------------------------------------------
@@ -125,6 +129,14 @@ void loop()
 // SENSOR INPUT CODE-----------------------------------------------------------
 void processSensors()
 {
+
+  // Pump Loops
+  // pumpLoop(RELAY_CO2_C, co2_control, CO2_UPPER_THRESHOLD, CO2_LOWER_THRESHOLD); // loop to control pump
+  // pumpLoop(RELAY_CO2_L, co2_lpgc, CO2_UPPER_THRESHOLD, CO2_LOWER_THRESHOLD); // loop to lpgc pump
+  pumpLoop(RELAY_CO2_C, tmp, 1, 0); // loop to control pump
+  pumpLoop(RELAY_CO2_L, tmp, 1, 0); // loop to lpgc pump
+  tmp = tmp == 1 ? 0 : 1;
+
   // Read sensor inputs
 
   // Control BME
@@ -147,9 +159,7 @@ void processSensors()
   sendRequestB(readCO2);
   co2_lpgc = getValueB(response);
 
-  // Pump Loops
-  pumpLoop(RELAY_CO2_C, co2_control, CO2_UPPER_THRESHOLD, CO2_LOWER_THRESHOLD); // loop to control pump
-  pumpLoop(RELAY_CO2_L, co2_lpgc, CO2_UPPER_THRESHOLD, CO2_LOWER_THRESHOLD); // loop to lpgc pump
+
 
   delay(delayTime); // delay between signal reads
 }
@@ -191,8 +201,13 @@ void sendDataToSerial()
 // PUMP LOOP CODE--------------------------------------------------------------
 void pumpLoop(uint8_t relay, int threshold, int upper, int lower)
 {
-  if (threshold <= lower)
+  // delay(10000);
+  if (threshold <= lower) {
+    delay(500);
     digitalWrite(relay, LOW);
+    delay(1000);
+    digitalWrite(relay, HIGH);
+  }
   else
     digitalWrite(relay, HIGH);
 }
