@@ -51,7 +51,10 @@
 #define RX_L 12                 // rx pin for CO2 (lpgc)
 #define TX_L 13                 // tx pin for CO2 (lpgc)
 #define CO2_LOWER_THRESHOLD 600 // threshold below which to enable pump
-#define RELAY_CO2_C A0          // pump pin connection (control)
+#define VAC_LOWER_THRESHOLD 783 // threshold below which to enable pump
+#define VAC_UPPER_THRESHOLD 866 // threshold above which to disable pump
+#define RELAY_VAC   A0
+// #define RELAY_CO2_C A0          // pump pin connection (control) - temp for vacuum
 #define RELAY_CO2_L A1          // pump pin connection (lpgc)
 #define RELAY_LED_C A2          // LED pin connection (control)
 #define RELAY_LED_L A3          // LED pin connection (lpgc)
@@ -101,16 +104,18 @@ void setup()
   bme_lpgc.begin(0x77, &Wire);
 
   // Set pump relay pin mode
-  pinMode(RELAY_CO2_C, OUTPUT);
-  pinMode(RELAY_CO2_L, OUTPUT);
+  pinMode(RELAY_VAC, OUTPUT);
+  // pinMode(RELAY_CO2_C, OUTPUT);
+  // pinMode(RELAY_CO2_L, OUTPUT);
   pinMode(RELAY_LED_C, OUTPUT);
   pinMode(RELAY_LED_L, OUTPUT);
 
-  // Set LEDs on 
+  // Set LEDs on and pumps off
+  digitalWrite(RELAY_VAC, HIGH);
+  // digitalWrite(RELAY_CO2_C, HIGH);
+  // digitalWrite(RELAY_CO2_L, HIGH);
   digitalWrite(RELAY_LED_C, LOW);
   digitalWrite(RELAY_LED_L, LOW);
-  digitalWrite(RELAY_CO2_C, HIGH);
-  digitalWrite(RELAY_CO2_L, HIGH);
 }
 
 // START OF MAIN LOOP ---------------------------------------------------------
@@ -118,7 +123,6 @@ void loop()
 {
   // Gather and process sensor data
   processSensors();
-
   // Read Excel variables from serial port (Data Streamer)
   processIncomingSerial();
   // Process and send data to Excel via serial port (Data Streamer)
@@ -128,13 +132,15 @@ void loop()
 // SENSOR INPUT CODE-----------------------------------------------------------
 void processSensors()
 {
-
   // Pump Loops
   // pumpLoop(RELAY_CO2_C, co2_control, CO2_LOWER_THRESHOLD); // loop to control pump
   // pumpLoop(RELAY_CO2_L, co2_lpgc, CO2_LOWER_THRESHOLD); // loop to lpgc pump
+
   // pumpLoop(RELAY_CO2_C, tmp, 1, 0); // loop to control pump
   // pumpLoop(RELAY_CO2_L, tmp, 1, 0); // loop to lpgc pump
   // tmp = tmp == 1 ? 0 : 1;
+
+  pumpLoop(RELAY_VAC, pres_lpgc, VAC_UPPER_THRESHOLD, VAC_LOWER_THRESHOLD); // loop to vac pump
 
   // Read sensor inputs
 
@@ -151,12 +157,12 @@ void processSensors()
   // Listen to first CO2 port
   portOne.listen();
   sendRequestA(readCO2);
-  co2_control = getValueA(response);
+  co2_lpgc = getValueA(response);
 
   // Listen to second CO2 port
   portTwo.listen();
   sendRequestB(readCO2);
-  co2_lpgc = getValueB(response);
+  co2_control = getValueB(response);
 
   delay(delayTime); // delay between signal reads
 }
@@ -196,10 +202,17 @@ void sendDataToSerial()
 }
 
 // PUMP LOOP CODE--------------------------------------------------------------
-void pumpLoop(uint8_t relay, int threshold, int lower)
+void pumpLoop(uint8_t relay, int val, int upper, int lower)
 {
-  if (threshold <= lower) {
-    delay(500);
+  if (val <= lower) 
+    digitalWrite(relay, HIGH);
+  else if (val >= upper)
+    digitalWrite(relay, LOW);
+}
+
+void pumpPulse(uint8_t relay, int val, int lower)
+{
+  if (val <= lower) {
     digitalWrite(relay, LOW);
     delay(1000);
     digitalWrite(relay, HIGH);
@@ -207,7 +220,6 @@ void pumpLoop(uint8_t relay, int threshold, int lower)
   else
     digitalWrite(relay, HIGH);
 }
-
 //-----------------------------------------------------------------------------
 // DO NOT EDIT ANYTHING BELOW THIS LINE
 //-----------------------------------------------------------------------------
